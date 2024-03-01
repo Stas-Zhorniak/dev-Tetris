@@ -1,8 +1,25 @@
-"use strict";
 
-const scoreElement = document.querySelector('.score');
 const PLAYFIELD_COLUMNS = 10;
 const PLAYFIELD_ROWS = 20;
+const btnRestart = document.querySelector('.btn-restart');
+const scoreElement = document.querySelector('.score');
+const overlay = document.querySelector('.overlay');
+const spaceBtn = document.querySelectorAll('.nav svg #Space-btn path');
+const escBtn = document.querySelectorAll('.nav svg #Escape-btn path');
+const leftBtn = document.querySelectorAll('.nav svg #Left-btn path');
+const downBtn = document.querySelectorAll('.nav svg #Down-btn path');
+const upBtn = document.querySelectorAll('.nav svg #Up-btn path');
+const rightBtn = document.querySelectorAll('.nav svg #Right-btn path');
+const restartBtn = document.querySelector('.nav svg #Restart-btn');
+
+let isGameOver = false;
+let timedId = null;
+let isPaused = false;
+let playField;
+let tetramino;
+let score = 0;
+let startTime;
+
 const TETRAMINO_NAMES = [
     'O',
     'J',
@@ -57,16 +74,30 @@ const TETRAMINOES = {
     ]
 
 }
+let cells;
+ init();
 
+function init(){
+    score = 0;
+    scoreElement.innerHTML = 0;
+    isGameOver = false;
+    startTime = Date.now();
+    generatePlayField();
+    generateTetramino();
+    cells = document.querySelectorAll('.grid div');
+    moveDown();
+    
+}
+
+btnRestart.addEventListener("click", function(){
+    document.querySelector('.grid').innerHTML = '';
+    overlay.style.display = "none";
+    init();
+})
 
 function convertPositionToIndex(row, column) {
     return row * PLAYFIELD_COLUMNS + column;
 }
-
-
-let playField;
-let tetramino;
-let score = 0;
 
 function countScore(destroyRows){
     switch(destroyRows){
@@ -86,8 +117,6 @@ function countScore(destroyRows){
     scoreElement.innerHTML = score;
 }
 
-
-
 function generatePlayField () {
     for(let i=0; i < PLAYFIELD_ROWS * PLAYFIELD_COLUMNS; i++) {
         const div = document.createElement("div");
@@ -95,10 +124,8 @@ function generatePlayField () {
     }
 
     playField = new Array(PLAYFIELD_ROWS).fill()
-                    .map(() => new Array(PLAYFIELD_COLUMNS).fill(0))
-    // console.table(playField)
+                    .map(() => new Array(PLAYFIELD_COLUMNS).fill(0));
 }
-
 
 function generateTetramino () {
 
@@ -119,17 +146,25 @@ function placeTetramino() {
     const matrixSize = tetramino.matrix.length;
     for(let row = 0; row <matrixSize; row++) {
         for (let column = 0; column < matrixSize; column++) {
+            
+            if(isOutsideOfTopboard(row)) {
+                isGameOver = true;
+                return;
+            }
+            
             if(tetramino.matrix[row][column]){
                 playField[tetramino.row + row][tetramino.column + column] = tetramino.name;
             }
             
         }
     }
+
     const filledRows = findFilledRows();
     removeFillRows(filledRows);
     generateTetramino();
     countScore(filledRows.length);
 }
+
 
 function removeFillRows(filledRows){
     for(let i = 0; i < filledRows.length; i++){
@@ -166,10 +201,6 @@ function findFilledRows(){
     return fillRows;
 }
 
-generatePlayField();
-generateTetramino();
-const cells = document.querySelectorAll('.grid div');
-
 function drawPlayField () {
     for(let row = 0; row < PLAYFIELD_ROWS; row++) {
         for (let column =0; column < PLAYFIELD_COLUMNS; column++) {
@@ -181,7 +212,6 @@ function drawPlayField () {
             }
         }
     }
-
 
 function drawTetramino () {
 
@@ -201,19 +231,11 @@ const tetraminoMatrixSize = tetramino.matrix.length;
  }
 }
 
-
 function draw() {
     cells.forEach(cell => cell.removeAttribute('class'));
     drawPlayField();
     drawTetramino();
 }
-
-// let showRotated = [
-//     [1,2,3],
-//     [4,5,6],
-//     [7,8,9]
-// ];
-
 
 function rotateTetramino() {
     const oldMatrix = tetramino.matrix;
@@ -225,7 +247,6 @@ function rotateTetramino() {
     }
 
 }
-// draw();
 
 function rotate () {
     rotateTetramino();
@@ -235,21 +256,69 @@ function rotate () {
 document.addEventListener("keydown", onKeyDown);
 
 function onKeyDown(e){
-    switch(e.key) {
-        case 'ArrowUp':
-            rotate();
-            break;
-        case 'ArrowDown':
-            moveTetraminoDown();
-            break;
-        case 'ArrowLeft':
-            moveTetraminoLeft();
-            break;
-        case 'ArrowRight':
-            moveTetraminoRight();
-            break;
+    if(e.key == "Escape") {
+        togglePauseGame();
     }
+    if (!isPaused) {
+        switch(e.key) {
+            case ' ':
+            dropTetraminoDown();
+            spaceBtn.forEach(item => {
+                item.style.fill = "white";
+            });
+            break;
+            case 'ArrowUp':
+                rotate();
+                upBtn.forEach(item => {
+                    item.style.fill = "white";
+                });
+                break;
+            case 'ArrowDown':
+                moveTetraminoDown();
+                downBtn.forEach(item => {
+                    item.style.fill = "white";
+                });
+                break;
+            case 'ArrowLeft':
+                moveTetraminoLeft();
+                leftBtn.forEach(item => {
+                    item.style.fill = "white";
+                });
+                break;
+            case 'ArrowRight':
+                moveTetraminoRight();
+                rightBtn.forEach(item => {
+                    item.style.fill = "white";
+                });
+                break;
+            }
+        }
+    
     draw();
+}
+
+function dropTetraminoDown () {
+    while(isValid()) {
+        tetramino.row++;
+    }
+    tetramino.row--;
+}
+
+function togglePauseGame(){
+    if (isPaused === false) {
+        stopLoop();
+        overlay.style.display = "flex";
+        escBtn.forEach(item => {
+            item.style.fill = "white";
+        })
+    } else {
+        startLoop();
+        overlay.style.display = "none";
+        escBtn.forEach(item => {
+            item.style.fill = "black";
+        })
+    }
+    isPaused = !isPaused;
 }
 
 function rotateMatrix(matrixTetramino) {
@@ -263,7 +332,6 @@ function rotateMatrix(matrixTetramino) {
     }
     return rotateMatrix;
 }
-
 
 function moveTetraminoDown() {
     tetramino.row += 1;
@@ -287,21 +355,48 @@ function moveTetraminoRight() {
     }
 }
 
+
 function moveDown(){
     moveTetraminoDown();
     draw();
     stopLoop();
     startLoop();
+    if(isGameOver){
+        gameOver();
+    }
 }
-let timedId = null;
-moveDown();
+
+function gameOver() {
+    stopLoop();
+    overlay.style.display = "flex";
+
+    const resultsContainer = document.querySelector('.results');
+    resultsContainer.innerHTML = `
+        <div class="result-item">Время игры: <span id="game-time"></span></div>
+        <div class="result-item">Набранные баллы: <span id="game-score"></span></div>`;
+
+    const gameTimeElement = document.getElementById('game-time');
+    const gameScoreElement = document.getElementById('game-score');
+
+    const gameTimeInSeconds = Math.floor((Date.now() - startTime) / 1000);
+    const gameTimeMinutes = Math.floor(gameTimeInSeconds / 60);
+    const gameTimeSeconds = gameTimeInSeconds % 60;
+
+    gameTimeElement.textContent = `${gameTimeMinutes} мин ${gameTimeSeconds} сек`;
+    gameScoreElement.textContent = score;
+
+}
+
 function startLoop(){
-    setTimeout(()=>{ timedId = requestAnimationFrame(moveDown) }, 700)
+    if (!timedId) {
+        timedId = setTimeout(()=>{ requestAnimationFrame(moveDown) }, 700)
+    }
 }
 
 function stopLoop(){
     cancelAnimationFrame(timedId);
-    timedId = clearTimeout(timedId);
+    clearTimeout(timedId);
+    timedId = null;
 }
 
 function isValid() {
@@ -318,7 +413,6 @@ function isValid() {
             }
         }
     }
-
     return true;
 }
 
@@ -333,11 +427,43 @@ return tetramino.matrix[row][column] &&
     tetramino.column + column >= PLAYFIELD_COLUMNS ||
     tetramino.row + row >= PLAYFIELD_ROWS
 );
-
 }
 
 function hasCollisions(row,column) {
-    return tetramino.matrix[row][column] 
-    && playField[tetramino.row + row]?.[tetramino.column + column];
+    return tetramino.matrix[row][column] && playField[tetramino.row + row]?.[tetramino.column + column];
 }
  
+    document.addEventListener("keyup", function (e) {
+        switch(e.key) {
+            case ' ':
+            spaceBtn.forEach(item => {
+                item.style.fill = "black";
+            });
+            break;
+            case 'ArrowUp':
+                upBtn.forEach(item => {
+                    item.style.fill = "black";
+                });
+                break;
+            case 'ArrowDown':
+                downBtn.forEach(item => {
+                    item.style.fill = "black";
+                });
+                break;
+            case 'ArrowLeft':
+                leftBtn.forEach(item => {
+                    item.style.fill = "black";
+                });
+                break;
+            case 'ArrowRight':
+                rightBtn.forEach(item => {
+                    item.style.fill = "black";
+                });
+                break;
+            }
+        })
+    restartBtn.addEventListener("click", function () {
+        document.querySelector('.grid').innerHTML = '';
+    overlay.style.display = "none";
+    init();
+    }) ;
